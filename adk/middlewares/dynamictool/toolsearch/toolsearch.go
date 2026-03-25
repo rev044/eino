@@ -127,7 +127,7 @@ type middleware struct {
 	sr                 string
 }
 
-func (m *middleware) BeforeAgent(ctx context.Context, runCtx *adk.ChatModelAgentContext) (context.Context, *adk.ChatModelAgentContext, error) {
+func (m *middleware) BeforeAgent(ctx context.Context, runCtx *adk.ChatModelAgentContext[*schema.Message]) (context.Context, *adk.ChatModelAgentContext[*schema.Message], error) {
 	if runCtx == nil {
 		return ctx, runCtx, nil
 	}

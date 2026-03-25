@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"github.com/cloudwego/eino/adk"
+	"github.com/cloudwego/eino/schema"
 )
 
 // Config is the configuration for the tool search middleware.
@@ -53,7 +54,7 @@ type middleware struct {
 	baseDir string
 }
 
-func (m *middleware) BeforeAgent(ctx context.Context, runCtx *adk.ChatModelAgentContext) (context.Context, *adk.ChatModelAgentContext, error) {
+func (m *middleware) BeforeAgent(ctx context.Context, runCtx *adk.ChatModelAgentContext[*schema.Message]) (context.Context, *adk.ChatModelAgentContext[*schema.Message], error) {
 	if runCtx == nil {
 		return ctx, runCtx, nil
 	}

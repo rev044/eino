@@ -34,26 +34,6 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-func testTruncOffloadPath(root string) func(context.Context, *ToolDetail) (string, error) {
-	return func(_ context.Context, detail *ToolDetail) (string, error) {
-		callID := "generated"
-		if detail != nil && detail.ToolContext != nil && detail.ToolContext.CallID != "" {
-			callID = detail.ToolContext.CallID
-		}
-		return fmt.Sprintf("%s/trunc/%s", root, callID), nil
-	}
-}
-
-func testClearOffloadPath(root string) func(context.Context, *ToolDetail) (string, error) {
-	return func(_ context.Context, detail *ToolDetail) (string, error) {
-		callID := "generated"
-		if detail != nil && detail.ToolContext != nil && detail.ToolContext.CallID != "" {
-			callID = detail.ToolContext.CallID
-		}
-		return fmt.Sprintf("%s/clear/%s", root, callID), nil
-	}
-}
-
 func TestReductionMiddlewareTrunc(t *testing.T) {
 	ctx := context.Background()
 	it := mockInvokableTool()
@@ -71,7 +51,7 @@ func TestReductionMiddlewareTrunc(t *testing.T) {
 				"mock_invokable_tool": {
 					Backend:        backend,
 					SkipTruncation: false,
-					TruncHandler:   defaultTruncHandler(testTruncOffloadPath("/tmp"), 70),
+					TruncHandler:   defaultTruncHandler("/tmp", 70),
 				},
 			},
 		}
@@ -104,7 +84,7 @@ hello worldhello worldhello worldhello worldhello worldhello worldhello worldhel
 				"mock_streamable_tool": {
 					Backend:        backend,
 					SkipTruncation: false,
-					TruncHandler:   defaultTruncHandler(testTruncOffloadPath("/tmp"), 70),
+					TruncHandler:   defaultTruncHandler("/tmp", 70),
 				},
 			},
 		}
@@ -140,7 +120,7 @@ hello worldhello worldhello worldhello worldhello worldhello worldhello worldhel
 				"mock_streamable_tool": {
 					Backend:        backend,
 					SkipTruncation: false,
-					TruncHandler:   defaultTruncHandler(testTruncOffloadPath("/tmp"), 70),
+					TruncHandler:   defaultTruncHandler("/tmp", 70),
 				},
 			},
 		}
@@ -277,36 +257,6 @@ hello worldhello worldhello worldhello worldhello worldhello worldhello worldhel
 		assert.NoError(t, err)
 		assert.Equal(t, expOrigContent, content.Content)
 	})
-
-	t.Run("test GenTruncOffloadFilePath used by default trunc handler", func(t *testing.T) {
-		tCtx := &adk.ToolContext{
-			Name:   "mock_invokable_tool",
-			CallID: "custom_123",
-		}
-		backend := filesystem.NewInMemoryBackend()
-		config := &Config{
-			Backend:           backend,
-			MaxLengthForTrunc: 70,
-			RootDir:           "/tmp/ignored",
-			GenTruncOffloadFilePath: func(_ context.Context, detail *ToolDetail) (string, error) {
-				assert.Equal(t, "custom_123", detail.ToolContext.CallID)
-				return "/custom/trunc/custom_123", nil
-			},
-		}
-
-		mw, err := New(ctx, config)
-		assert.NoError(t, err)
-
-		edp, err := mw.WrapInvokableToolCall(ctx, it.InvokableRun, tCtx)
-		assert.NoError(t, err)
-
-		resp, err := edp(ctx, `{"value":"asd"}`)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, "/custom/trunc/custom_123")
-
-		_, err = backend.Read(ctx, &filesystem.ReadRequest{FilePath: "/custom/trunc/custom_123"})
-		assert.NoError(t, err)
-	})
 }
 
 func TestReductionMiddlewareClear(t *testing.T) {
@@ -335,7 +285,7 @@ func TestReductionMiddlewareClear(t *testing.T) {
 				"get_weather": {
 					Backend:      backend,
 					SkipClear:    false,
-					ClearHandler: defaultClearHandler(testClearOffloadPath("/tmp"), true, "read_file"),
+					ClearHandler: defaultClearHandler("/tmp", true, "read_file"),
 				},
 			},
 		}
@@ -390,49 +340,6 @@ func TestReductionMiddlewareClear(t *testing.T) {
 		assert.Equal(t, "Sunny", fileContentStr)
 	})
 
-	t.Run("test GenClearOffloadFilePath used by default clear handler", func(t *testing.T) {
-		backend := filesystem.NewInMemoryBackend()
-		config := &Config{
-			Backend:                   backend,
-			SkipTruncation:            true,
-			TokenCounter:              func(context.Context, []adk.Message, []*schema.ToolInfo) (int64, error) { return 100, nil },
-			MaxTokensForClear:         20,
-			ClearRetentionSuffixLimit: 1,
-			RootDir:                   "/tmp/ignored",
-			GenClearOffloadFilePath: func(_ context.Context, detail *ToolDetail) (string, error) {
-				return "/custom/clear/" + detail.ToolContext.CallID, nil
-			},
-		}
-
-		mw, err := New(ctx, config)
-		assert.NoError(t, err)
-
-		_, s, err := mw.BeforeModelRewriteState(ctx, &adk.ChatModelAgentState{
-			Messages: []adk.Message{
-				schema.SystemMessage("you are a helpful assistant"),
-				schema.UserMessage("trigger clear"),
-				schema.AssistantMessage("", []schema.ToolCall{
-					{ID: "call_a", Type: "function", Function: schema.FunctionCall{Name: "get_weather", Arguments: `{}`}},
-				}),
-				schema.ToolMessage("Sunny", "call_a"),
-				schema.AssistantMessage("", []schema.ToolCall{
-					{ID: "call_b", Type: "function", Function: schema.FunctionCall{Name: "get_weather", Arguments: `{}`}},
-				}),
-				schema.ToolMessage("Sunny", "call_b"),
-			},
-		}, &adk.ModelContext{Tools: toolsInfo})
-		assert.NoError(t, err)
-
-		assert.Equal(t, "<persisted-output>Tool result saved to: /custom/clear/call_a\nUse read_file to view</persisted-output>", s.Messages[3].Content)
-
-		fileContent, err := backend.Read(ctx, &filesystem.ReadRequest{
-			FilePath: "/custom/clear/call_a",
-		})
-		assert.NoError(t, err)
-		fileContentStr := strings.TrimPrefix(strings.TrimSpace(fileContent.Content), "1\t")
-		assert.Equal(t, "Sunny", fileContentStr)
-	})
-
 	t.Run("test default clear without offloading", func(t *testing.T) {
 		config := &Config{
 			SkipTruncation:            true,
@@ -442,7 +349,7 @@ func TestReductionMiddlewareClear(t *testing.T) {
 			ToolConfig: map[string]*ToolReductionConfig{
 				"get_weather": {
 					SkipClear:    false,
-					ClearHandler: defaultClearHandler(testClearOffloadPath(""), false, ""),
+					ClearHandler: defaultClearHandler("", false, ""),
 				},
 			},
 		}
@@ -604,7 +511,7 @@ func TestReductionMiddlewareClear(t *testing.T) {
 				"get_weather": {
 					Backend:      backend,
 					SkipClear:    false,
-					ClearHandler: defaultClearHandler(testClearOffloadPath("/tmp"), true, "read_file"),
+					ClearHandler: defaultClearHandler("/tmp", true, "read_file"),
 				},
 			},
 		}
@@ -700,12 +607,12 @@ func TestReductionMiddlewareClear(t *testing.T) {
 				"get_weather": {
 					Backend:      backend,
 					SkipClear:    false,
-					ClearHandler: defaultClearHandler(testClearOffloadPath("/tmp"), true, "read_file"),
+					ClearHandler: defaultClearHandler("/tmp", true, "read_file"),
 				},
 				"get_important_data": {
 					Backend:      backend,
 					SkipClear:    false,
-					ClearHandler: defaultClearHandler(testClearOffloadPath("/tmp"), true, "read_file"),
+					ClearHandler: defaultClearHandler("/tmp", true, "read_file"),
 				},
 			},
 		}
@@ -778,12 +685,12 @@ func TestReductionMiddlewareClear(t *testing.T) {
 				"get_weather": {
 					Backend:      backend,
 					SkipClear:    false,
-					ClearHandler: defaultClearHandler(testClearOffloadPath("/tmp"), true, "read_file"),
+					ClearHandler: defaultClearHandler("/tmp", true, "read_file"),
 				},
 				"get_important_data": {
 					Backend:      backend,
 					SkipClear:    false,
-					ClearHandler: defaultClearHandler(testClearOffloadPath("/tmp"), true, "read_file"),
+					ClearHandler: defaultClearHandler("/tmp", true, "read_file"),
 				},
 			},
 		}
@@ -850,12 +757,12 @@ func TestReductionMiddlewareClear(t *testing.T) {
 				"get_weather": {
 					Backend:      backend,
 					SkipClear:    false,
-					ClearHandler: defaultClearHandler(testClearOffloadPath("/tmp"), true, "read_file"),
+					ClearHandler: defaultClearHandler("/tmp", true, "read_file"),
 				},
 				"get_important_data": {
 					Backend:      backend,
 					SkipClear:    false,
-					ClearHandler: defaultClearHandler(testClearOffloadPath("/tmp"), true, "read_file"),
+					ClearHandler: defaultClearHandler("/tmp", true, "read_file"),
 				},
 			},
 		}
@@ -1020,7 +927,7 @@ func TestDefaultTruncHandlerWithStreamToolResult(t *testing.T) {
 			StreamToolResult: sr,
 		}
 
-		fn := defaultTruncHandler(testTruncOffloadPath("/tmp"), 100)
+		fn := defaultTruncHandler("/tmp", 100)
 		result, err := fn(ctx, detail)
 		assert.NoError(t, err)
 		assert.False(t, result.NeedTrunc)
@@ -1042,30 +949,10 @@ func TestDefaultTruncHandlerWithStreamToolResult(t *testing.T) {
 			StreamToolResult: sr,
 		}
 
-		fn := defaultTruncHandler(testTruncOffloadPath("/tmp"), 100)
+		fn := defaultTruncHandler("/tmp", 100)
 		result, err := fn(ctx, detail)
 		assert.NoError(t, err)
 		assert.True(t, result.NeedTrunc)
-	})
-
-	t.Run("test gen offload file path error", func(t *testing.T) {
-		detail := &ToolDetail{
-			ToolContext: &adk.ToolContext{
-				Name:   "test",
-				CallID: "call_id",
-			},
-			ToolArgument: &schema.ToolArgument{Text: "{}"},
-			ToolResult: &schema.ToolResult{
-				Parts: []schema.ToolOutputPart{{Type: schema.ToolPartTypeText, Text: strings.Repeat("x", 1000)}},
-			},
-		}
-
-		fn := defaultTruncHandler(func(context.Context, *ToolDetail) (string, error) {
-			return "", fmt.Errorf("gen path error")
-		}, 10)
-		_, err := fn(ctx, detail)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "gen path error")
 	})
 }
 
@@ -1088,31 +975,12 @@ func TestDefaultClearHandlerWithStreamToolResult(t *testing.T) {
 			StreamToolResult: sr,
 		}
 
-		fn := defaultClearHandler(testClearOffloadPath("/tmp"), true, "read_file")
+		fn := defaultClearHandler("/tmp", true, "read_file")
 		result, err := fn(ctx, detail)
 		assert.NoError(t, err)
 		assert.True(t, result.NeedClear)
 		assert.True(t, result.NeedOffload)
 		assert.Equal(t, "streaming content", result.OffloadContent)
-	})
-
-	t.Run("test gen offload file path error", func(t *testing.T) {
-		detail := &ToolDetail{
-			ToolContext: &adk.ToolContext{
-				Name:   "test",
-				CallID: "call_id",
-			},
-			ToolArgument: &schema.ToolArgument{Text: "{}"},
-			ToolResult: &schema.ToolResult{
-				Parts: []schema.ToolOutputPart{{Type: schema.ToolPartTypeText, Text: "content"}},
-			},
-		}
-		fn := defaultClearHandler(func(context.Context, *ToolDetail) (string, error) {
-			return "", fmt.Errorf("gen path error")
-		}, true, "read_file")
-		_, err := fn(ctx, detail)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "gen path error")
 	})
 }
 
@@ -1127,7 +995,7 @@ func TestDefaultOffloadHandler(t *testing.T) {
 		ToolResult:   &schema.ToolResult{Parts: []schema.ToolOutputPart{{Type: schema.ToolPartTypeText, Text: "hello"}}},
 	}
 
-	fn := defaultClearHandler(testClearOffloadPath("/tmp"), true, "read_file")
+	fn := defaultClearHandler("/tmp", true, "read_file")
 	info, err := fn(ctx, detail)
 	assert.NoError(t, err)
 	assert.Equal(t, &ClearResult{
@@ -1453,40 +1321,6 @@ func TestCopyAndFillDefaults(t *testing.T) {
 		assert.Equal(t, 50000, result.MaxLengthForTrunc)
 		assert.Equal(t, 1, result.ClearRetentionSuffixLimit)
 		assert.NotNil(t, result.TokenCounter)
-		assert.NotNil(t, result.GenTruncOffloadFilePath)
-		assert.NotNil(t, result.GenClearOffloadFilePath)
-
-		truncPath, err := result.GenTruncOffloadFilePath(context.Background(), &ToolDetail{
-			ToolContext: &adk.ToolContext{CallID: "call_1"},
-		})
-		assert.NoError(t, err)
-		assert.Equal(t, "/tmp/trunc/call_1", truncPath)
-
-		clearPath, err := result.GenClearOffloadFilePath(context.Background(), &ToolDetail{
-			ToolContext: &adk.ToolContext{CallID: "call_1"},
-		})
-		assert.NoError(t, err)
-		assert.Equal(t, "/tmp/clear/call_1", clearPath)
-	})
-
-	t.Run("test default offload path generators create uuid when CallID is empty", func(t *testing.T) {
-		cfg := &Config{}
-		result, err := cfg.copyAndFillDefaults()
-		assert.NoError(t, err)
-
-		truncPath, err := result.GenTruncOffloadFilePath(context.Background(), &ToolDetail{
-			ToolContext: &adk.ToolContext{CallID: ""},
-		})
-		assert.NoError(t, err)
-		assert.True(t, strings.HasPrefix(truncPath, "/tmp/trunc/"))
-		assert.NotEqual(t, "/tmp/trunc/", truncPath)
-
-		clearPath, err := result.GenClearOffloadFilePath(context.Background(), &ToolDetail{
-			ToolContext: &adk.ToolContext{CallID: ""},
-		})
-		assert.NoError(t, err)
-		assert.True(t, strings.HasPrefix(clearPath, "/tmp/clear/"))
-		assert.NotEqual(t, "/tmp/clear/", clearPath)
 	})
 
 	t.Run("test with tool config", func(t *testing.T) {
@@ -1501,26 +1335,6 @@ func TestCopyAndFillDefaults(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result.ToolConfig)
 		assert.True(t, result.ToolConfig["test_tool"].SkipTruncation)
-	})
-
-	t.Run("test custom offload path generators preserved", func(t *testing.T) {
-		cfg := &Config{
-			RootDir: "/tmp/ignored",
-			GenTruncOffloadFilePath: func(_ context.Context, detail *ToolDetail) (string, error) {
-				return "/custom/trunc/" + detail.ToolContext.CallID, nil
-			},
-			GenClearOffloadFilePath: func(_ context.Context, detail *ToolDetail) (string, error) {
-				return "/custom/clear/" + detail.ToolContext.CallID, nil
-			},
-		}
-		result, err := cfg.copyAndFillDefaults()
-		assert.NoError(t, err)
-
-		filePath, err := result.GenClearOffloadFilePath(context.Background(), &ToolDetail{
-			ToolContext: &adk.ToolContext{CallID: "call_custom"},
-		})
-		assert.NoError(t, err)
-		assert.Equal(t, "/custom/clear/call_custom", filePath)
 	})
 }
 
@@ -1549,7 +1363,7 @@ func TestDefaultClearHandler(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("test empty parts", func(t *testing.T) {
-		handler := defaultClearHandler(testClearOffloadPath("/tmp"), true, "read_file")
+		handler := defaultClearHandler("/tmp", true, "read_file")
 		detail := &ToolDetail{
 			ToolContext: &adk.ToolContext{
 				CallID: "test_call",
@@ -1562,7 +1376,7 @@ func TestDefaultClearHandler(t *testing.T) {
 	})
 
 	t.Run("test multimodal content", func(t *testing.T) {
-		handler := defaultClearHandler(testClearOffloadPath("/tmp"), true, "read_file")
+		handler := defaultClearHandler("/tmp", true, "read_file")
 		detail := &ToolDetail{
 			ToolContext: &adk.ToolContext{
 				CallID: "test_call",
@@ -1577,7 +1391,7 @@ func TestDefaultClearHandler(t *testing.T) {
 	})
 
 	t.Run("test no call id", func(t *testing.T) {
-		handler := defaultClearHandler(testClearOffloadPath("/tmp"), true, "read_file")
+		handler := defaultClearHandler("/tmp", true, "read_file")
 		detail := &ToolDetail{
 			ToolContext: &adk.ToolContext{},
 			ToolResult: &schema.ToolResult{
@@ -1587,7 +1401,7 @@ func TestDefaultClearHandler(t *testing.T) {
 		result, err := handler(ctx, detail)
 		assert.NoError(t, err)
 		assert.True(t, result.NeedClear)
-		assert.Equal(t, "/tmp/clear/generated", result.OffloadFilePath)
+		assert.NotEmpty(t, result.OffloadFilePath)
 	})
 }
 
@@ -2259,493 +2073,5 @@ func TestReductionMiddlewareEnhancedTrunc(t *testing.T) {
 		assert.NoError(t, err)
 		_, err = wrapped(ctx, toolArg)
 		assert.EqualError(t, err, "truncation: no backend for offload")
-	})
-}
-
-func TestClearRewriteMessagesHandler(t *testing.T) {
-	ctx := context.Background()
-	it := mockInvokableTool()
-	st := mockStreamableTool()
-	tools := []tool.BaseTool{it, st}
-	var toolsInfo []*schema.ToolInfo
-	for _, bt := range tools {
-		ti, _ := bt.Info(ctx)
-		toolsInfo = append(toolsInfo, ti)
-	}
-
-	tokenCounter := func(_ context.Context, msgs []adk.Message, _ []*schema.ToolInfo) (int64, error) {
-		return int64(1000), nil
-	}
-
-	t.Run("test all tools hit - rewrite to system reminder", func(t *testing.T) {
-		config := &Config{
-			SkipTruncation:     true,
-			TokenCounter:       tokenCounter,
-			MaxTokensForClear:  10,
-			ClearAtLeastTokens: 0,
-			ClearMessageRewriter: func(ctx context.Context, assistantMessage adk.Message, toolResponses []adk.Message) (messagesAfterRewrite []adk.Message, err error) {
-				return []adk.Message{
-					schema.UserMessage("<system-reminder>write_file and edit_file executed successfully</system-reminder>"),
-				}, nil
-			},
-		}
-
-		mw, err := New(ctx, config)
-		assert.NoError(t, err)
-		_, s, err := mw.BeforeModelRewriteState(ctx, &adk.ChatModelAgentState{
-			Messages: []adk.Message{
-				schema.SystemMessage("you are a helpful assistant"),
-				schema.UserMessage("user request"),
-				schema.AssistantMessage("", []schema.ToolCall{
-					{
-						ID:       "call_1",
-						Type:     "function",
-						Function: schema.FunctionCall{Name: "write_file", Arguments: `{"file": "test.txt", "content": "hello"}`},
-					},
-					{
-						ID:       "call_2",
-						Type:     "function",
-						Function: schema.FunctionCall{Name: "edit_file", Arguments: `{"file": "test.txt", "changes": "add"}`},
-					},
-				}),
-				schema.ToolMessage("write success", "call_1"),
-				schema.ToolMessage("edit success", "call_2"),
-				schema.AssistantMessage("done", nil),
-				schema.AssistantMessage("", []schema.ToolCall{{ID: "dummy", Type: "function", Function: schema.FunctionCall{Name: "dummy_tool"}}}),
-			},
-		}, &adk.ModelContext{
-			Tools: toolsInfo,
-		})
-		assert.NoError(t, err)
-		assert.Len(t, s.Messages, 5)
-		assert.Equal(t, schema.User, s.Messages[2].Role)
-		assert.Equal(t, "<system-reminder>write_file and edit_file executed successfully</system-reminder>", s.Messages[2].Content)
-		assert.Equal(t, schema.Assistant, s.Messages[3].Role)
-		assert.Equal(t, "done", s.Messages[3].Content)
-	})
-
-	t.Run("test remove tool call and tool responses", func(t *testing.T) {
-		config := &Config{
-			SkipTruncation:     true,
-			TokenCounter:       tokenCounter,
-			MaxTokensForClear:  10,
-			ClearAtLeastTokens: 0,
-			ClearMessageRewriter: func(ctx context.Context, assistantMessage adk.Message, toolResponses []adk.Message) (messagesAfterRewrite []adk.Message, err error) {
-				return []adk.Message{}, nil
-			},
-		}
-
-		mw, err := New(ctx, config)
-		assert.NoError(t, err)
-		_, s, err := mw.BeforeModelRewriteState(ctx, &adk.ChatModelAgentState{
-			Messages: []adk.Message{
-				schema.SystemMessage("you are a helpful assistant"),
-				schema.UserMessage("user request"),
-				schema.AssistantMessage("", []schema.ToolCall{
-					{
-						ID:       "call_1",
-						Type:     "function",
-						Function: schema.FunctionCall{Name: "write_file", Arguments: `{"file": "test.txt", "content": "hello"}`},
-					},
-					{
-						ID:       "call_2",
-						Type:     "function",
-						Function: schema.FunctionCall{Name: "edit_file", Arguments: `{"file": "test.txt", "changes": "add"}`},
-					},
-				}),
-				schema.ToolMessage("write success", "call_1"),
-				schema.ToolMessage("edit success", "call_2"),
-				schema.AssistantMessage("", []schema.ToolCall{{ID: "dummy", Type: "function", Function: schema.FunctionCall{Name: "dummy_tool"}}}),
-				schema.ToolMessage("dummy dummy", "dummy"),
-				schema.AssistantMessage("done", nil),
-			},
-		}, &adk.ModelContext{
-			Tools: toolsInfo,
-		})
-		assert.NoError(t, err)
-		assert.Len(t, s.Messages, 5)
-		assert.Equal(t, schema.Assistant, s.Messages[2].Role)
-		assert.Equal(t, schema.Tool, s.Messages[3].Role)
-		assert.Equal(t, "dummy dummy", s.Messages[3].Content)
-		assert.Equal(t, schema.Assistant, s.Messages[4].Role)
-		assert.Equal(t, "done", s.Messages[4].Content)
-	})
-
-	t.Run("test partial tools hit - keep unhit tools and rewrite hit ones", func(t *testing.T) {
-		config := &Config{
-			SkipTruncation:     true,
-			TokenCounter:       tokenCounter,
-			MaxTokensForClear:  10,
-			ClearAtLeastTokens: 0,
-			ClearExcludeTools:  []string{"get_weather"},
-			ClearMessageRewriter: func(ctx context.Context, assistantMessage adk.Message, toolResponses []adk.Message) (messagesAfterRewrite []adk.Message, err error) {
-				hitToolIDs := map[string]bool{"call_1": true}
-
-				newToolCalls := make([]schema.ToolCall, 0)
-				newToolResponses := make([]adk.Message, 0)
-
-				for i, tc := range assistantMessage.ToolCalls {
-					if !hitToolIDs[tc.ID] {
-						newToolCalls = append(newToolCalls, tc)
-						if i < len(toolResponses) {
-							newToolResponses = append(newToolResponses, toolResponses[i])
-						}
-					}
-				}
-
-				result := []adk.Message{
-					schema.UserMessage("<system-reminder>write_file executed successfully</system-reminder>"),
-				}
-				if len(newToolCalls) > 0 {
-					result = append(result, schema.AssistantMessage("", newToolCalls))
-					result = append(result, newToolResponses...)
-				}
-				return result, nil
-			},
-		}
-
-		mw, err := New(ctx, config)
-		assert.NoError(t, err)
-		_, s, err := mw.BeforeModelRewriteState(ctx, &adk.ChatModelAgentState{
-			Messages: []adk.Message{
-				schema.SystemMessage("you are a helpful assistant"),
-				schema.UserMessage("user request"),
-				schema.AssistantMessage("", []schema.ToolCall{
-					{
-						ID:       "call_1",
-						Type:     "function",
-						Function: schema.FunctionCall{Name: "write_file", Arguments: `{"file": "test.txt", "content": "hello"}`},
-					},
-					{
-						ID:       "call_2",
-						Type:     "function",
-						Function: schema.FunctionCall{Name: "get_weather", Arguments: `{"location": "London"}`},
-					},
-				}),
-				schema.ToolMessage("write success", "call_1"),
-				schema.ToolMessage("sunny", "call_2"),
-				schema.AssistantMessage("", []schema.ToolCall{{ID: "dummy", Type: "function", Function: schema.FunctionCall{Name: "dummy_tool"}}}),
-			},
-		}, &adk.ModelContext{
-			Tools: toolsInfo,
-		})
-		assert.NoError(t, err)
-		assert.Len(t, s.Messages, 6)
-		assert.Equal(t, schema.User, s.Messages[2].Role)
-		assert.Equal(t, "<system-reminder>write_file executed successfully</system-reminder>", s.Messages[2].Content)
-		assert.Equal(t, schema.Assistant, s.Messages[3].Role)
-		assert.Len(t, s.Messages[3].ToolCalls, 1)
-		assert.Equal(t, "call_2", s.Messages[3].ToolCalls[0].ID)
-		assert.Equal(t, schema.Tool, s.Messages[4].Role)
-		assert.Equal(t, "sunny", s.Messages[4].Content)
-	})
-
-	t.Run("test mixed messages with system/user before", func(t *testing.T) {
-		config := &Config{
-			SkipTruncation:     true,
-			TokenCounter:       tokenCounter,
-			MaxTokensForClear:  10,
-			ClearAtLeastTokens: 0,
-			ClearMessageRewriter: func(ctx context.Context, assistantMessage adk.Message, toolResponses []adk.Message) (messagesAfterRewrite []adk.Message, err error) {
-				return []adk.Message{
-					schema.UserMessage("<system-reminder>tool executed</system-reminder>"),
-				}, nil
-			},
-		}
-
-		mw, err := New(ctx, config)
-		assert.NoError(t, err)
-		_, s, err := mw.BeforeModelRewriteState(ctx, &adk.ChatModelAgentState{
-			Messages: []adk.Message{
-				schema.SystemMessage("you are a helpful assistant"),
-				schema.UserMessage("first request"),
-				schema.AssistantMessage("", []schema.ToolCall{
-					{
-						ID:       "call_1",
-						Type:     "function",
-						Function: schema.FunctionCall{Name: "write_file", Arguments: `{"file": "test.txt"}`},
-					},
-				}),
-				schema.ToolMessage("success", "call_1"),
-				schema.UserMessage("second request"),
-				schema.AssistantMessage("", []schema.ToolCall{{ID: "dummy", Type: "function", Function: schema.FunctionCall{Name: "dummy_tool"}}}),
-			},
-		}, &adk.ModelContext{
-			Tools: toolsInfo,
-		})
-		assert.NoError(t, err)
-		assert.Len(t, s.Messages, 5)
-		assert.Equal(t, schema.System, s.Messages[0].Role)
-		assert.Equal(t, schema.User, s.Messages[1].Role)
-		assert.Equal(t, schema.User, s.Messages[2].Role)
-		assert.Equal(t, "<system-reminder>tool executed</system-reminder>", s.Messages[2].Content)
-		assert.Equal(t, schema.User, s.Messages[3].Role)
-	})
-
-	t.Run("test mixed messages with system/user before", func(t *testing.T) {
-		config := &Config{
-			SkipTruncation:     true,
-			TokenCounter:       tokenCounter,
-			MaxTokensForClear:  10,
-			ClearAtLeastTokens: 0,
-			ClearMessageRewriter: func(ctx context.Context, assistantMessage adk.Message, toolResponses []adk.Message) (messagesAfterRewrite []adk.Message, err error) {
-				return []adk.Message{
-					schema.UserMessage("<system-reminder>tool executed</system-reminder>"),
-				}, nil
-			},
-		}
-
-		mw, err := New(ctx, config)
-		assert.NoError(t, err)
-		_, s, err := mw.BeforeModelRewriteState(ctx, &adk.ChatModelAgentState{
-			Messages: []adk.Message{
-				schema.SystemMessage("you are a helpful assistant"),
-				schema.UserMessage("first request"),
-				schema.AssistantMessage("", []schema.ToolCall{
-					{
-						ID:       "call_1",
-						Type:     "function",
-						Function: schema.FunctionCall{Name: "write_file", Arguments: `{"file": "test.txt"}`},
-					},
-				}),
-				schema.ToolMessage("success", "call_1"),
-				schema.UserMessage("second request"),
-				schema.AssistantMessage("", []schema.ToolCall{{ID: "dummy", Type: "function", Function: schema.FunctionCall{Name: "dummy_tool"}}}),
-			},
-		}, &adk.ModelContext{
-			Tools: toolsInfo,
-		})
-		assert.NoError(t, err)
-		assert.Len(t, s.Messages, 5)
-		assert.Equal(t, schema.System, s.Messages[0].Role)
-		assert.Equal(t, schema.User, s.Messages[1].Role)
-		assert.Equal(t, schema.User, s.Messages[2].Role)
-		assert.Equal(t, "<system-reminder>tool executed</system-reminder>", s.Messages[2].Content)
-		assert.Equal(t, schema.User, s.Messages[3].Role)
-	})
-
-	t.Run("test assistant message without tool calls - keep as is", func(t *testing.T) {
-		handlerCalled := false
-		config := &Config{
-			SkipTruncation:     true,
-			TokenCounter:       tokenCounter,
-			MaxTokensForClear:  10,
-			ClearAtLeastTokens: 0,
-			ClearMessageRewriter: func(ctx context.Context, assistantMessage adk.Message, toolResponses []adk.Message) (messagesAfterRewrite []adk.Message, err error) {
-				handlerCalled = true
-				return nil, nil
-			},
-		}
-
-		mw, err := New(ctx, config)
-		assert.NoError(t, err)
-		_, s, err := mw.BeforeModelRewriteState(ctx, &adk.ChatModelAgentState{
-			Messages: []adk.Message{
-				schema.SystemMessage("you are a helpful assistant"),
-				schema.UserMessage("user request"),
-				schema.AssistantMessage("regular response without tools", nil),
-				schema.AssistantMessage("", []schema.ToolCall{{ID: "dummy", Type: "function", Function: schema.FunctionCall{Name: "dummy_tool"}}}),
-			},
-		}, &adk.ModelContext{
-			Tools: toolsInfo,
-		})
-		assert.NoError(t, err)
-		assert.False(t, handlerCalled)
-		assert.Len(t, s.Messages, 4)
-		assert.Equal(t, schema.Assistant, s.Messages[2].Role)
-		assert.Equal(t, "regular response without tools", s.Messages[2].Content)
-	})
-
-	t.Run("test clear not meeting threshold - should keep original messages", func(t *testing.T) {
-		originalTokenCount := int64(1000)
-		rewrittenTokenCount := int64(999)
-		callCount := 0
-
-		config := &Config{
-			SkipTruncation: true,
-			TokenCounter: func(_ context.Context, msgs []adk.Message, _ []*schema.ToolInfo) (int64, error) {
-				callCount++
-				if callCount == 1 {
-					return originalTokenCount, nil
-				}
-				return rewrittenTokenCount, nil
-			},
-			MaxTokensForClear:  10,
-			ClearAtLeastTokens: 10,
-			ClearMessageRewriter: func(ctx context.Context, assistantMessage adk.Message, toolResponses []adk.Message) (messagesAfterRewrite []adk.Message, err error) {
-				return []adk.Message{
-					schema.UserMessage("<system-reminder>tool executed</system-reminder>"),
-				}, nil
-			},
-		}
-
-		originalMessages := []adk.Message{
-			schema.SystemMessage("you are a helpful assistant"),
-			schema.UserMessage("user request"),
-			schema.AssistantMessage("", []schema.ToolCall{
-				{
-					ID:       "call_1",
-					Type:     "function",
-					Function: schema.FunctionCall{Name: "write_file", Arguments: `{"file": "test.txt"}`},
-				},
-			}),
-			schema.ToolMessage("success", "call_1"),
-			schema.AssistantMessage("", []schema.ToolCall{{ID: "dummy", Type: "function", Function: schema.FunctionCall{Name: "dummy_tool"}}}),
-		}
-
-		mw, err := New(ctx, config)
-		assert.NoError(t, err)
-		_, s, err := mw.BeforeModelRewriteState(ctx, &adk.ChatModelAgentState{
-			Messages: originalMessages,
-		}, &adk.ModelContext{
-			Tools: toolsInfo,
-		})
-		assert.NoError(t, err)
-		assert.Len(t, s.Messages, len(originalMessages))
-		for i := range originalMessages {
-			assert.Equal(t, originalMessages[i].Role, s.Messages[i].Role)
-			assert.Equal(t, originalMessages[i].Content, s.Messages[i].Content)
-		}
-	})
-
-	t.Run("test applyClearRewrite with default role", func(t *testing.T) {
-		config := &Config{
-			SkipTruncation:     true,
-			TokenCounter:       tokenCounter,
-			MaxTokensForClear:  10,
-			ClearAtLeastTokens: 0,
-			ClearMessageRewriter: func(ctx context.Context, assistantMessage adk.Message, toolResponses []adk.Message) (messagesAfterRewrite []adk.Message, err error) {
-				return []adk.Message{}, nil
-			},
-		}
-
-		mw, err := New(ctx, config)
-		assert.NoError(t, err)
-
-		unknownRoleMsg := &schema.Message{
-			Role:    "unknown_role",
-			Content: "unknown",
-		}
-
-		_, s, err := mw.BeforeModelRewriteState(ctx, &adk.ChatModelAgentState{
-			Messages: []adk.Message{
-				schema.SystemMessage("you are a helpful assistant"),
-				schema.UserMessage("user request"),
-				unknownRoleMsg,
-				schema.AssistantMessage("", []schema.ToolCall{{ID: "dummy", Type: "function", Function: schema.FunctionCall{Name: "dummy_tool"}}}),
-			},
-		}, &adk.ModelContext{
-			Tools: toolsInfo,
-		})
-		assert.NoError(t, err)
-		assert.NotNil(t, s)
-	})
-
-	t.Run("test applyClearRewrite with rewrite error", func(t *testing.T) {
-		expectedErr := fmt.Errorf("rewrite error")
-		config := &Config{
-			SkipTruncation:     true,
-			TokenCounter:       tokenCounter,
-			MaxTokensForClear:  10,
-			ClearAtLeastTokens: 0,
-			ClearMessageRewriter: func(ctx context.Context, assistantMessage adk.Message, toolResponses []adk.Message) (messagesAfterRewrite []adk.Message, err error) {
-				return nil, expectedErr
-			},
-		}
-
-		mw, err := New(ctx, config)
-		assert.NoError(t, err)
-
-		_, _, err = mw.BeforeModelRewriteState(ctx, &adk.ChatModelAgentState{
-			Messages: []adk.Message{
-				schema.SystemMessage("you are a helpful assistant"),
-				schema.UserMessage("user request"),
-				schema.AssistantMessage("", []schema.ToolCall{
-					{
-						ID:       "call_1",
-						Type:     "function",
-						Function: schema.FunctionCall{Name: "write_file", Arguments: `{"file": "test.txt"}`},
-					},
-				}),
-				schema.ToolMessage("success", "call_1"),
-				schema.AssistantMessage("", []schema.ToolCall{{ID: "dummy", Type: "function", Function: schema.FunctionCall{Name: "dummy_tool"}}}),
-			},
-		}, &adk.ModelContext{
-			Tools: toolsInfo,
-		})
-		assert.Error(t, err)
-		assert.Equal(t, expectedErr, err)
-	})
-
-	t.Run("test applyClearRewrite with missing tool responses", func(t *testing.T) {
-		config := &Config{
-			SkipTruncation:     true,
-			TokenCounter:       tokenCounter,
-			MaxTokensForClear:  10,
-			ClearAtLeastTokens: 0,
-			ClearMessageRewriter: func(ctx context.Context, assistantMessage adk.Message, toolResponses []adk.Message) (messagesAfterRewrite []adk.Message, err error) {
-				assert.Nil(t, toolResponses)
-				return []adk.Message{
-					schema.UserMessage("<system-reminder>tool executed</system-reminder>"),
-				}, nil
-			},
-		}
-
-		mw, err := New(ctx, config)
-		assert.NoError(t, err)
-		_, s, err := mw.BeforeModelRewriteState(ctx, &adk.ChatModelAgentState{
-			Messages: []adk.Message{
-				schema.SystemMessage("you are a helpful assistant"),
-				schema.UserMessage("user request"),
-				schema.AssistantMessage("", []schema.ToolCall{
-					{
-						ID:       "call_1",
-						Type:     "function",
-						Function: schema.FunctionCall{Name: "write_file", Arguments: `{"file": "test.txt"}`},
-					},
-				}),
-				schema.AssistantMessage("", []schema.ToolCall{{ID: "dummy", Type: "function", Function: schema.FunctionCall{Name: "dummy_tool"}}}),
-			},
-		}, &adk.ModelContext{
-			Tools: toolsInfo,
-		})
-		assert.NoError(t, err)
-		assert.NotNil(t, s)
-	})
-
-	t.Run("test applyClearRewrite with clearAtLeastTokens > 0", func(t *testing.T) {
-		config := &Config{
-			SkipTruncation:     true,
-			TokenCounter:       tokenCounter,
-			MaxTokensForClear:  10,
-			ClearAtLeastTokens: 10,
-			ClearMessageRewriter: func(ctx context.Context, assistantMessage adk.Message, toolResponses []adk.Message) (messagesAfterRewrite []adk.Message, err error) {
-				return []adk.Message{
-					schema.UserMessage("<system-reminder>tool executed</system-reminder>"),
-				}, nil
-			},
-		}
-
-		mw, err := New(ctx, config)
-		assert.NoError(t, err)
-		_, s, err := mw.BeforeModelRewriteState(ctx, &adk.ChatModelAgentState{
-			Messages: []adk.Message{
-				schema.SystemMessage("you are a helpful assistant"),
-				schema.UserMessage("user request"),
-				schema.AssistantMessage("", []schema.ToolCall{
-					{
-						ID:       "call_1",
-						Type:     "function",
-						Function: schema.FunctionCall{Name: "write_file", Arguments: `{"file": "test.txt"}`},
-					},
-				}),
-				schema.ToolMessage("success", "call_1"),
-				schema.AssistantMessage("", []schema.ToolCall{{ID: "dummy", Type: "function", Function: schema.FunctionCall{Name: "dummy_tool"}}}),
-			},
-		}, &adk.ModelContext{
-			Tools: toolsInfo,
-		})
-		assert.NoError(t, err)
-		assert.NotNil(t, s)
 	})
 }

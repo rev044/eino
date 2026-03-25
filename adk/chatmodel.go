@@ -791,9 +791,10 @@ type execContext struct {
 	toolUpdated  bool // whether needs to pass a compose.WithToolList option to ToolsNode due to tool list change
 }
 
-func (a *TypedChatModelAgent[M]) applyBeforeAgent(ctx context.Context, ec *execContext) (context.Context, *execContext, error) {
-	runCtx := &ChatModelAgentContext{
+func (a *TypedChatModelAgent[M]) applyBeforeAgent(ctx context.Context, ec *execContext, agentInput *TypedAgentInput[M]) (context.Context, *execContext, error) {
+	runCtx := &ChatModelAgentContext[M]{
 		Instruction:    ec.instruction,
+		AgentInput:     agentInput,
 		Tools:          cloneSlice(ec.unwrappedTools),
 		ReturnDirectly: copyMap(ec.returnDirectly),
 	}
@@ -1394,7 +1395,7 @@ func (a *TypedChatModelAgent[M]) buildRunFunc(ctx context.Context) typedRunFunc[
 	return a.run
 }
 
-func (a *TypedChatModelAgent[M]) getRunFunc(ctx context.Context) (context.Context, typedRunFunc[M], *execContext, error) {
+func (a *TypedChatModelAgent[M]) getRunFunc(ctx context.Context, agentInput *TypedAgentInput[M]) (context.Context, typedRunFunc[M], *execContext, error) {
 	defaultRun := a.buildRunFunc(ctx)
 	bc := a.exeCtx
 
@@ -1412,7 +1413,7 @@ func (a *TypedChatModelAgent[M]) getRunFunc(ctx context.Context) (context.Contex
 		return ctx, defaultRun, runtimeBC, nil
 	}
 
-	ctx, runtimeBC, err := a.applyBeforeAgent(ctx, bc)
+	ctx, runtimeBC, err := a.applyBeforeAgent(ctx, bc, agentInput)
 	if err != nil {
 		return ctx, nil, nil, err
 	}
@@ -1447,7 +1448,7 @@ func (a *TypedChatModelAgent[M]) Run(ctx context.Context, input *TypedAgentInput
 		cancelCtx = getCancelContext(ctx)
 	}
 
-	ctx, run, bc, err := a.getRunFunc(ctx)
+	ctx, run, bc, err := a.getRunFunc(ctx, input)
 	if err != nil {
 		go func() {
 			if cancelCtxOwned && cancelCtx != nil {
@@ -1523,7 +1524,7 @@ func (a *TypedChatModelAgent[M]) Resume(ctx context.Context, info *ResumeInfo, o
 		cancelCtx = getCancelContext(ctx)
 	}
 
-	ctx, run, bc, err := a.getRunFunc(ctx)
+	ctx, run, bc, err := a.getRunFunc(ctx, nil)
 	if err != nil {
 		go func() {
 			if cancelCtxOwned && cancelCtx != nil {

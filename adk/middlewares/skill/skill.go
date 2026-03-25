@@ -243,7 +243,7 @@ type skillHandler struct {
 	tool        *skillTool
 }
 
-func (h *skillHandler) BeforeAgent(ctx context.Context, runCtx *adk.ChatModelAgentContext) (context.Context, *adk.ChatModelAgentContext, error) {
+func (h *skillHandler) BeforeAgent(ctx context.Context, runCtx *adk.ChatModelAgentContext[*schema.Message]) (context.Context, *adk.ChatModelAgentContext[*schema.Message], error) {
 	runCtx.Instruction = runCtx.Instruction + "\n" + h.instruction
 	runCtx.Tools = append(runCtx.Tools, h.tool)
 	return ctx, runCtx, nil
