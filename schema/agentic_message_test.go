@@ -497,8 +497,8 @@ func TestConcatAgenticMessages(t *testing.T) {
 						FunctionToolResult: &FunctionToolResult{
 							CallID: "call_123",
 							Name:   "get_weather",
-							Blocks: []*FunctionToolResultBlock{
-								{Text: &UserInputText{Text: `{"temp`}},
+							Content: []*FunctionToolResultContentBlock{
+								{Type: FunctionToolResultContentBlockText, Text: &UserInputText{Text: `{"temp`}},
 							},
 						},
 						StreamingMeta: &StreamingMeta{Index: 0},
@@ -511,8 +511,8 @@ func TestConcatAgenticMessages(t *testing.T) {
 					{
 						Type: ContentBlockTypeFunctionToolResult,
 						FunctionToolResult: &FunctionToolResult{
-							Blocks: []*FunctionToolResultBlock{
-								{Text: &UserInputText{Text: `":72}`}},
+							Content: []*FunctionToolResultContentBlock{
+								{Type: FunctionToolResultContentBlockText, Text: &UserInputText{Text: `":72}`}},
 							},
 						},
 						StreamingMeta: &StreamingMeta{Index: 0},
@@ -526,9 +526,9 @@ func TestConcatAgenticMessages(t *testing.T) {
 		assert.Len(t, result.ContentBlocks, 1)
 		assert.Equal(t, "call_123", result.ContentBlocks[0].FunctionToolResult.CallID)
 		assert.Equal(t, "get_weather", result.ContentBlocks[0].FunctionToolResult.Name)
-		assert.Equal(t, 2, len(result.ContentBlocks[0].FunctionToolResult.Blocks))
-		assert.Equal(t, `{"temp`, result.ContentBlocks[0].FunctionToolResult.Blocks[0].Text.Text)
-		assert.Equal(t, `":72}`, result.ContentBlocks[0].FunctionToolResult.Blocks[1].Text.Text)
+		assert.Equal(t, 2, len(result.ContentBlocks[0].FunctionToolResult.Content))
+		assert.Equal(t, `{"temp`, result.ContentBlocks[0].FunctionToolResult.Content[0].Text.Text)
+		assert.Equal(t, `":72}`, result.ContentBlocks[0].FunctionToolResult.Content[1].Text.Text)
 	})
 
 	t.Run("concat server tool call", func(t *testing.T) {
@@ -576,9 +576,9 @@ func TestConcatAgenticMessages(t *testing.T) {
 					{
 						Type: ContentBlockTypeServerToolResult,
 						ServerToolResult: &ServerToolResult{
-							CallID: "server_call_1",
-							Name:   "server_func",
-							Result: "result1",
+							CallID:  "server_call_1",
+							Name:    "server_func",
+							Content: "result1",
 						},
 						StreamingMeta: &StreamingMeta{Index: 0},
 					},
@@ -601,7 +601,7 @@ func TestConcatAgenticMessages(t *testing.T) {
 		assert.Len(t, result.ContentBlocks, 1)
 		assert.Equal(t, "server_call_1", result.ContentBlocks[0].ServerToolResult.CallID)
 		assert.Equal(t, "server_func", result.ContentBlocks[0].ServerToolResult.Name)
-		assert.Equal(t, "result1", result.ContentBlocks[0].ServerToolResult.Result)
+		assert.Equal(t, "result1", result.ContentBlocks[0].ServerToolResult.Content)
 	})
 
 	t.Run("concat mcp tool call", func(t *testing.T) {
@@ -655,7 +655,7 @@ func TestConcatAgenticMessages(t *testing.T) {
 							ServerLabel: "mcp-server",
 							CallID:      "mcp_call_1",
 							Name:        "mcp_func",
-							Result:      `First`,
+							Content:     `First`,
 						},
 						StreamingMeta: &StreamingMeta{Index: 0},
 					},
@@ -667,7 +667,7 @@ func TestConcatAgenticMessages(t *testing.T) {
 					{
 						Type: ContentBlockTypeMCPToolResult,
 						MCPToolResult: &MCPToolResult{
-							Result: `Second`,
+							Content: `Second`,
 						},
 						StreamingMeta: &StreamingMeta{Index: 0},
 					},
@@ -681,7 +681,7 @@ func TestConcatAgenticMessages(t *testing.T) {
 		assert.Equal(t, "mcp-server", result.ContentBlocks[0].MCPToolResult.ServerLabel)
 		assert.Equal(t, "mcp_call_1", result.ContentBlocks[0].MCPToolResult.CallID)
 		assert.Equal(t, "mcp_func", result.ContentBlocks[0].MCPToolResult.Name)
-		assert.Equal(t, `Second`, result.ContentBlocks[0].MCPToolResult.Result)
+		assert.Equal(t, `Second`, result.ContentBlocks[0].MCPToolResult.Content)
 	})
 
 	t.Run("concat mcp list tools", func(t *testing.T) {
@@ -1305,8 +1305,8 @@ func TestAgenticMessageString(t *testing.T) {
 				FunctionToolResult: &FunctionToolResult{
 					CallID: "call_weather_123",
 					Name:   "get_current_weather",
-					Blocks: []*FunctionToolResultBlock{
-						{Text: &UserInputText{Text: `{"temperature":72,"condition":"sunny","humidity":45,"wind_speed":8}`}},
+					Content: []*FunctionToolResultContentBlock{
+						{Type: FunctionToolResultContentBlockText, Text: &UserInputText{Text: `{"temperature":72,"condition":"sunny","humidity":45,"wind_speed":8}`}},
 					},
 				},
 			},
@@ -1321,9 +1321,9 @@ func TestAgenticMessageString(t *testing.T) {
 			{
 				Type: ContentBlockTypeServerToolResult,
 				ServerToolResult: &ServerToolResult{
-					Name:   "server_tool",
-					CallID: "call_1",
-					Result: map[string]any{"success": true},
+					Name:    "server_tool",
+					CallID:  "call_1",
+					Content: map[string]any{"success": true},
 				},
 			},
 			{
@@ -1355,9 +1355,9 @@ func TestAgenticMessageString(t *testing.T) {
 			{
 				Type: ContentBlockTypeMCPToolResult,
 				MCPToolResult: &MCPToolResult{
-					CallID: "mcp_forecast_456",
-					Name:   "get_7day_forecast",
-					Result: `{"status":"partial","days_available":3}`,
+					CallID:  "mcp_forecast_456",
+					Name:    "get_7day_forecast",
+					Content: `{"status":"partial","days_available":3}`,
 					Error: &MCPToolCallError{
 						Code:    ptrOf[int64](503),
 						Message: "Service temporarily unavailable for full 7-day forecast",
@@ -1437,7 +1437,7 @@ Finally, I'll format the response in a user-friendly way with temperature and co
   [11] type: function_tool_result
       call_id: call_weather_123
       name: get_current_weather
-      blocks: (1 blocks)
+      content: (1 blocks)
         [0]       text: {"temperature":72,"condition":"sunny","humidity":45,"wind_speed":8}
   [12] type: server_tool_call
       name: server_tool
@@ -1448,7 +1448,7 @@ Finally, I'll format the response in a user-friendly way with temperature and co
   [13] type: server_tool_result
       name: server_tool
       call_id: call_1
-      result: {
+      content: {
   "success": true
 }
   [14] type: mcp_tool_approval_request
@@ -1468,7 +1468,7 @@ Finally, I'll format the response in a user-friendly way with temperature and co
   [17] type: mcp_tool_result
       call_id: mcp_forecast_456
       name: get_7day_forecast
-      result: {"status":"partial","days_available":3}
+      content: {"status":"partial","days_available":3}
       error: [503] Service temporarily unavailable for full 7-day forecast
   [18] type: mcp_list_tools_result
       server_label: weather-mcp-server
@@ -1557,8 +1557,8 @@ func TestUserAgenticMessage(t *testing.T) {
 
 func TestFunctionToolResultAgenticMessage(t *testing.T) {
 	t.Run("basic", func(t *testing.T) {
-		blocks := []*FunctionToolResultBlock{
-			{Text: &UserInputText{Text: "result_str"}},
+		blocks := []*FunctionToolResultContentBlock{
+			{Type: FunctionToolResultContentBlockText, Text: &UserInputText{Text: "result_str"}},
 		}
 		msg := FunctionToolResultAgenticMessage("call_1", "tool_name", blocks)
 		assert.Equal(t, AgenticRoleTypeUser, msg.Role)
@@ -1566,14 +1566,14 @@ func TestFunctionToolResultAgenticMessage(t *testing.T) {
 		assert.Equal(t, ContentBlockTypeFunctionToolResult, msg.ContentBlocks[0].Type)
 		assert.Equal(t, "call_1", msg.ContentBlocks[0].FunctionToolResult.CallID)
 		assert.Equal(t, "tool_name", msg.ContentBlocks[0].FunctionToolResult.Name)
-		assert.Len(t, msg.ContentBlocks[0].FunctionToolResult.Blocks, 1)
-		assert.Equal(t, "result_str", msg.ContentBlocks[0].FunctionToolResult.Blocks[0].Text.Text)
+		assert.Len(t, msg.ContentBlocks[0].FunctionToolResult.Content, 1)
+		assert.Equal(t, "result_str", msg.ContentBlocks[0].FunctionToolResult.Content[0].Text.Text)
 	})
 
 	t.Run("multimodal", func(t *testing.T) {
-		blocks := []*FunctionToolResultBlock{
-			{Text: &UserInputText{Text: "description"}},
-			{Image: &UserInputImage{URL: "https://example.com/img.png"}},
+		blocks := []*FunctionToolResultContentBlock{
+			{Type: FunctionToolResultContentBlockText, Text: &UserInputText{Text: "description"}},
+			{Type: FunctionToolResultContentBlockImage, Image: &UserInputImage{URL: "https://example.com/img.png"}},
 		}
 		msg := FunctionToolResultAgenticMessage("call_2", "vision_tool", blocks)
 		assert.Equal(t, AgenticRoleTypeUser, msg.Role)
@@ -1581,9 +1581,9 @@ func TestFunctionToolResultAgenticMessage(t *testing.T) {
 		ftr := msg.ContentBlocks[0].FunctionToolResult
 		assert.Equal(t, "call_2", ftr.CallID)
 		assert.Equal(t, "vision_tool", ftr.Name)
-		assert.Len(t, ftr.Blocks, 2)
-		assert.Equal(t, "description", ftr.Blocks[0].Text.Text)
-		assert.Equal(t, "https://example.com/img.png", ftr.Blocks[1].Image.URL)
+		assert.Len(t, ftr.Content, 2)
+		assert.Equal(t, "description", ftr.Content[0].Text.Text)
+		assert.Equal(t, "https://example.com/img.png", ftr.Content[1].Image.URL)
 	})
 }
 
@@ -1706,4 +1706,115 @@ func TestConcatAssistantGenTexts_ExtensionOverwrite(t *testing.T) {
 				"with extensions.Interface(), discarding the concatenation.")
 		}
 	}
+}
+
+func TestFunctionToolResultBlockString(t *testing.T) {
+	t.Run("empty type", func(t *testing.T) {
+		b := &FunctionToolResultContentBlock{Text: &UserInputText{Text: "x"}}
+		assert.Equal(t, "unknown block type: <empty>\n", b.String())
+	})
+
+	t.Run("known type but empty payload", func(t *testing.T) {
+		b := &FunctionToolResultContentBlock{Type: FunctionToolResultContentBlockText}
+		assert.Equal(t, "empty text block\n", b.String())
+	})
+
+	t.Run("unknown type value", func(t *testing.T) {
+		b := &FunctionToolResultContentBlock{Type: FunctionToolResultContentBlockType("weird")}
+		assert.Equal(t, "unknown block type: weird\n", b.String())
+	})
+}
+
+func TestConcatFunctionToolResults(t *testing.T) {
+	t.Run("no streaming meta - direct append", func(t *testing.T) {
+		results := []*FunctionToolResult{
+			{CallID: "c1", Name: "tool1", Content: []*FunctionToolResultContentBlock{
+				{Type: FunctionToolResultContentBlockText, Text: &UserInputText{Text: "hello"}},
+			}},
+			{CallID: "c1", Name: "tool1", Content: []*FunctionToolResultContentBlock{
+				{Type: FunctionToolResultContentBlockImage, Image: &UserInputImage{URL: "http://img.png"}},
+			}},
+		}
+		got, err := concatFunctionToolResults(results)
+		require.NoError(t, err)
+		assert.Len(t, got.Content, 2)
+		assert.Equal(t, "hello", got.Content[0].Text.Text)
+		assert.Equal(t, "http://img.png", got.Content[1].Image.URL)
+	})
+
+	t.Run("text merge by streaming meta index", func(t *testing.T) {
+		results := []*FunctionToolResult{
+			{CallID: "c1", Name: "tool1", Content: []*FunctionToolResultContentBlock{
+				{Type: FunctionToolResultContentBlockText, Text: &UserInputText{Text: "hello"}, StreamingMeta: &StreamingMeta{Index: 0}},
+			}},
+			{CallID: "c1", Name: "tool1", Content: []*FunctionToolResultContentBlock{
+				{Type: FunctionToolResultContentBlockText, Text: &UserInputText{Text: " world"}, StreamingMeta: &StreamingMeta{Index: 0}},
+			}},
+			{CallID: "c1", Name: "tool1", Content: []*FunctionToolResultContentBlock{
+				{Type: FunctionToolResultContentBlockText, Text: &UserInputText{Text: " alex"}, StreamingMeta: &StreamingMeta{Index: 0}},
+			}},
+		}
+		got, err := concatFunctionToolResults(results)
+		require.NoError(t, err)
+		assert.Len(t, got.Content, 1)
+		assert.Equal(t, "hello world alex", got.Content[0].Text.Text)
+		assert.NotNil(t, got.Content[0].StreamingMeta)
+		assert.Equal(t, 0, got.Content[0].StreamingMeta.Index)
+	})
+
+	t.Run("multiple indices ordered", func(t *testing.T) {
+		results := []*FunctionToolResult{
+			{CallID: "c1", Name: "tool1", Content: []*FunctionToolResultContentBlock{
+				{Type: FunctionToolResultContentBlockText, Text: &UserInputText{Text: "a"}, StreamingMeta: &StreamingMeta{Index: 0}},
+				{Type: FunctionToolResultContentBlockImage, Image: &UserInputImage{URL: "img.png"}, StreamingMeta: &StreamingMeta{Index: 1}},
+			}},
+			{CallID: "c1", Name: "tool1", Content: []*FunctionToolResultContentBlock{
+				{Type: FunctionToolResultContentBlockText, Text: &UserInputText{Text: "b"}, StreamingMeta: &StreamingMeta{Index: 0}},
+			}},
+		}
+		got, err := concatFunctionToolResults(results)
+		require.NoError(t, err)
+		assert.Len(t, got.Content, 2)
+		assert.Equal(t, "ab", got.Content[0].Text.Text)
+		assert.Equal(t, "img.png", got.Content[1].Image.URL)
+	})
+
+	t.Run("error - inconsistent streaming meta", func(t *testing.T) {
+		results := []*FunctionToolResult{
+			{CallID: "c1", Name: "tool1", Content: []*FunctionToolResultContentBlock{
+				{Type: FunctionToolResultContentBlockText, Text: &UserInputText{Text: "a"}, StreamingMeta: &StreamingMeta{Index: 0}},
+			}},
+			{CallID: "c1", Name: "tool1", Content: []*FunctionToolResultContentBlock{
+				{Type: FunctionToolResultContentBlockText, Text: &UserInputText{Text: "b"}},
+			}},
+		}
+		_, err := concatFunctionToolResults(results)
+		assert.ErrorContains(t, err, "inconsistent streaming meta")
+	})
+
+	t.Run("error - duplicate non-text same index", func(t *testing.T) {
+		results := []*FunctionToolResult{
+			{CallID: "c1", Name: "tool1", Content: []*FunctionToolResultContentBlock{
+				{Type: FunctionToolResultContentBlockImage, Image: &UserInputImage{URL: "a.png"}, StreamingMeta: &StreamingMeta{Index: 0}},
+			}},
+			{CallID: "c1", Name: "tool1", Content: []*FunctionToolResultContentBlock{
+				{Type: FunctionToolResultContentBlockImage, Image: &UserInputImage{URL: "b.png"}, StreamingMeta: &StreamingMeta{Index: 0}},
+			}},
+		}
+		_, err := concatFunctionToolResults(results)
+		assert.ErrorContains(t, err, "only one block is allowed for non-text types")
+	})
+
+	t.Run("error - mixed types same index", func(t *testing.T) {
+		results := []*FunctionToolResult{
+			{CallID: "c1", Name: "tool1", Content: []*FunctionToolResultContentBlock{
+				{Type: FunctionToolResultContentBlockText, Text: &UserInputText{Text: "hi"}, StreamingMeta: &StreamingMeta{Index: 0}},
+			}},
+			{CallID: "c1", Name: "tool1", Content: []*FunctionToolResultContentBlock{
+				{Type: FunctionToolResultContentBlockImage, Image: &UserInputImage{URL: "x.png"}, StreamingMeta: &StreamingMeta{Index: 0}},
+			}},
+		}
+		_, err := concatFunctionToolResults(results)
+		assert.ErrorContains(t, err, "mixed types")
+	})
 }

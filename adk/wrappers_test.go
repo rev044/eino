@@ -1739,7 +1739,7 @@ func collectAgenticToolContent(events []*agenticAgentEvent) []string {
 		if !mo.IsStreaming && mo.Message != nil {
 			for _, cb := range mo.Message.ContentBlocks {
 				if cb.FunctionToolResult != nil {
-					for _, b := range cb.FunctionToolResult.Blocks {
+					for _, b := range cb.FunctionToolResult.Content {
 						if b.Text != nil {
 							contents = append(contents, b.Text.Text)
 						}
@@ -1756,7 +1756,7 @@ func collectAgenticToolContent(events []*agenticAgentEvent) []string {
 				}
 				for _, cb := range msg.ContentBlocks {
 					if cb.FunctionToolResult != nil {
-						for _, b := range cb.FunctionToolResult.Blocks {
+						for _, b := range cb.FunctionToolResult.Content {
 							if b.Text != nil {
 								contents = append(contents, b.Text.Text)
 							}
@@ -1917,9 +1917,9 @@ func TestAgenticEventSenderToolHandler(t *testing.T) {
 		require.Len(t, msg.ContentBlocks, 1)
 		ftr := msg.ContentBlocks[0].FunctionToolResult
 		require.NotNil(t, ftr)
-		require.Len(t, ftr.Blocks, 2)
-		assert.Equal(t, "caption", ftr.Blocks[0].Text.Text)
-		assert.Equal(t, "https://example.com/img.png", ftr.Blocks[1].Image.URL)
+		require.Len(t, ftr.Content, 2)
+		assert.Equal(t, "caption", ftr.Content[0].Text.Text)
+		assert.Equal(t, "https://example.com/img.png", ftr.Content[1].Image.URL)
 	})
 
 	t.Run("EnhancedStreamableMultimodal", func(t *testing.T) {
@@ -1956,7 +1956,7 @@ func TestAgenticEventSenderToolHandler(t *testing.T) {
 		// Drain the stream and verify multimodal content
 		mo := toolEvents[0].Output.MessageOutput
 		require.True(t, mo.IsStreaming)
-		var allBlocks []*schema.FunctionToolResultBlock
+		var allBlocks []*schema.FunctionToolResultContentBlock
 		for {
 			msg, err := mo.MessageStream.Recv()
 			if err != nil {
@@ -1964,7 +1964,7 @@ func TestAgenticEventSenderToolHandler(t *testing.T) {
 			}
 			for _, cb := range msg.ContentBlocks {
 				if cb.FunctionToolResult != nil {
-					allBlocks = append(allBlocks, cb.FunctionToolResult.Blocks...)
+					allBlocks = append(allBlocks, cb.FunctionToolResult.Content...)
 				}
 			}
 		}

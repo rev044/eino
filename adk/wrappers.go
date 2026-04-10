@@ -573,34 +573,36 @@ func newTypedEventSenderToolWrapper[M MessageType]() *typedEventSenderToolWrappe
 }
 
 // textToFunctionToolResultBlocks wraps a plain text string into FunctionToolResultBlocks.
-func textToFunctionToolResultBlocks(text string) []*schema.FunctionToolResultBlock {
+func textToFunctionToolResultBlocks(text string) []*schema.FunctionToolResultContentBlock {
 	if text == "" {
 		return nil
 	}
-	return []*schema.FunctionToolResultBlock{
-		{Text: &schema.UserInputText{Text: text}},
+	return []*schema.FunctionToolResultContentBlock{
+		{Type: schema.FunctionToolResultContentBlockText, Text: &schema.UserInputText{Text: text}},
 	}
 }
 
 // toolResultToBlocks converts a ToolResult's multimodal parts into FunctionToolResultBlocks.
 // This preserves all media types (text, image, audio, video, file), unlike toolResultText
 // which only extracts text.
-func toolResultToBlocks(tr *schema.ToolResult) []*schema.FunctionToolResultBlock {
+func toolResultToBlocks(tr *schema.ToolResult) []*schema.FunctionToolResultContentBlock {
 	if tr == nil || len(tr.Parts) == 0 {
 		return nil
 	}
-	blocks := make([]*schema.FunctionToolResultBlock, 0, len(tr.Parts))
+	blocks := make([]*schema.FunctionToolResultContentBlock, 0, len(tr.Parts))
 	for _, p := range tr.Parts {
-		var block *schema.FunctionToolResultBlock
+		var block *schema.FunctionToolResultContentBlock
 		switch p.Type {
 		case schema.ToolPartTypeText:
-			block = &schema.FunctionToolResultBlock{
+			block = &schema.FunctionToolResultContentBlock{
+				Type:  schema.FunctionToolResultContentBlockText,
 				Text:  &schema.UserInputText{Text: p.Text},
 				Extra: p.Extra,
 			}
 		case schema.ToolPartTypeImage:
 			if p.Image != nil {
-				block = &schema.FunctionToolResultBlock{
+				block = &schema.FunctionToolResultContentBlock{
+					Type: schema.FunctionToolResultContentBlockImage,
 					Image: &schema.UserInputImage{
 						URL:        derefString(p.Image.URL),
 						Base64Data: derefString(p.Image.Base64Data),
@@ -611,7 +613,8 @@ func toolResultToBlocks(tr *schema.ToolResult) []*schema.FunctionToolResultBlock
 			}
 		case schema.ToolPartTypeAudio:
 			if p.Audio != nil {
-				block = &schema.FunctionToolResultBlock{
+				block = &schema.FunctionToolResultContentBlock{
+					Type: schema.FunctionToolResultContentBlockAudio,
 					Audio: &schema.UserInputAudio{
 						URL:        derefString(p.Audio.URL),
 						Base64Data: derefString(p.Audio.Base64Data),
@@ -622,7 +625,8 @@ func toolResultToBlocks(tr *schema.ToolResult) []*schema.FunctionToolResultBlock
 			}
 		case schema.ToolPartTypeVideo:
 			if p.Video != nil {
-				block = &schema.FunctionToolResultBlock{
+				block = &schema.FunctionToolResultContentBlock{
+					Type: schema.FunctionToolResultContentBlockVideo,
 					Video: &schema.UserInputVideo{
 						URL:        derefString(p.Video.URL),
 						Base64Data: derefString(p.Video.Base64Data),
@@ -633,7 +637,8 @@ func toolResultToBlocks(tr *schema.ToolResult) []*schema.FunctionToolResultBlock
 			}
 		case schema.ToolPartTypeFile:
 			if p.File != nil {
-				block = &schema.FunctionToolResultBlock{
+				block = &schema.FunctionToolResultContentBlock{
+					Type: schema.FunctionToolResultContentBlockFile,
 					File: &schema.UserInputFile{
 						URL:        derefString(p.File.URL),
 						Base64Data: derefString(p.File.Base64Data),
