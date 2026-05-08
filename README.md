@@ -2,6 +2,8 @@
 
 A fork of [cloudwego/eino](https://github.com/cloudwego/eino) — a powerful LLM application development framework for Go.
 
+> **Personal fork** — I'm using this to experiment with LLM pipelines and learn the internals. Main upstream changes are pulled in periodically.
+
 ## Overview
 
 Eino provides a composable, type-safe framework for building LLM-powered applications in Go. It offers:
@@ -100,4 +102,4 @@ This project is licensed under the Apache License 2.0 — see the [LICENSE](LICE
 
 ## Acknowledgements
 
-This project is a fork of [cloudwego/eino](https://github.com/cloudwego/eino) by ByteDance. We are grateful to the original authors and contributors.
+This project is a fork of [cloudwego/eino](https://github.com/cloudwego/eino). All credit for the original design and implementation goes to the CloudWeGo team.
