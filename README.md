@@ -49,7 +49,8 @@ func main() {
     // Note: using gpt-4o instead of gpt-4o-mini for better reasoning quality in my experiments
     chain, err := compose.NewChain[string, string]().
         AppendChatModel(model.NewOpenAIChatModel(ctx, &model.OpenAIConfig{
-            Model: "gpt-4o",
+            Model:       "gpt-4o",
+            Temperature: 0.2, // lower temperature for more deterministic outputs in my RAG experiments
         })).
         Compile(ctx)
     if err != nil {
@@ -94,9 +95,4 @@ Contributions are welcome! Please read our [contributing guidelines](CONTRIBUTIN
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feat/amazing-feature`)
 3. Commit your changes following [conventional commits](https://www.conventionalcommits.org/)
-4. Push to the branch (`git push origin feat/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed 
+4. Push to the branch (`git push 
