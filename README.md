@@ -46,9 +46,10 @@ func main() {
     ctx := context.Background()
 
     // Build a simple chain
+    // Note: using gpt-4o instead of gpt-4o-mini for better reasoning quality in my experiments
     chain, err := compose.NewChain[string, string]().
         AppendChatModel(model.NewOpenAIChatModel(ctx, &model.OpenAIConfig{
-            Model: "gpt-4o-mini",
+            Model: "gpt-4o",
         })).
         Compile(ctx)
     if err != nil {
@@ -98,8 +99,4 @@ Contributions are welcome! Please read our [contributing guidelines](CONTRIBUTIN
 
 ## License
 
-This project is licensed under the Apache License 2.0 — see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgements
-
-This project is a fork of [cloudwego/eino](https://github.com/cloudwego/eino). All credit for the original design and implementation goes to the CloudWeGo team.
+This project is licensed 
