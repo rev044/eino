@@ -51,6 +51,7 @@ func main() {
         AppendChatModel(model.NewOpenAIChatModel(ctx, &model.OpenAIConfig{
             Model:       "gpt-4o",
             Temperature: 0.2, // lower temperature for more deterministic outputs in my RAG experiments
+            MaxTokens:   1024, // capping tokens to keep costs reasonable during local testing
         })).
         Compile(ctx)
     if err != nil {
@@ -94,5 +95,4 @@ Contributions are welcome! Please read our [contributing guidelines](CONTRIBUTIN
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feat/amazing-feature`)
-3. Commit your changes following [conventional commits](https://www.conventionalcommits.org/)
-4. Push to the branch (`git push 
+3. Commit your ch
