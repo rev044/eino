@@ -89,8 +89,16 @@ eino/
 └── utils/            # Utility packages
 ```
 
+## Personal Notes
+
+Things I've found useful while exploring this codebase:
+
+- The `compose` package is the best place to start — `chain.go` and `graph.go` are well-commented
+- Streaming works via Go channels under the hood; see `schema/streaming.go` for the core types
+- When debugging graph execution, set `EINO_DEBUG=1` to get verbose node-level logging
+
 ## Contributing
 
 Contributions are welcome! Please read our [contributing guidelines](CONTRIBUTING.md) and check the [open issues](https://github.com/eino-project/eino/issues).
 
-1. Fork the repo
+1. 
