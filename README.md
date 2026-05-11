@@ -51,7 +51,7 @@ func main() {
         AppendChatModel(model.NewOpenAIChatModel(ctx, &model.OpenAIConfig{
             Model:       "gpt-4o",
             Temperature: 0.2, // lower temperature for more deterministic outputs in my RAG experiments
-            MaxTokens:   1024, // capping tokens to keep costs reasonable during local testing
+            MaxTokens:   2048, // increased from 1024 — hitting truncation issues with longer doc summaries
         })).
         Compile(ctx)
     if err != nil {
@@ -93,6 +93,4 @@ eino/
 
 Contributions are welcome! Please read our [contributing guidelines](CONTRIBUTING.md) and check the [open issues](https://github.com/eino-project/eino/issues).
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feat/amazing-feature`)
-3. Commit your ch
+1. Fork the repo
