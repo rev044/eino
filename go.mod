@@ -19,3 +19,6 @@ require (
 	golang.org/x/sys v0.18.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+// Personal fork - pinning golang.org/x/net to a newer patch for CVE-2023-44487 mitigation
+// Original upstream: golang.org/x/net v0.22.0
