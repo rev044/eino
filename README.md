@@ -94,7 +94,7 @@ eino/
 Things I've found useful while exploring this codebase:
 
 - The `compose` package is the best place to start — `chain.go` and `graph.go` are well-commented
-- Streaming: use `chain.Stream()` instead of `chain.Invoke()` and iterate with `stream.Recv()` in a loop
-- When building graphs, `AddEdge` vs `AddBranch` tripped me up early — branches are for conditional routing, edges are unconditional
-- The `flow/` package has ready-made patterns (ReAct agent, map-reduce) that are worth reading before rolling your own
-- TODO: investigate whether `graph.go` fan-out nodes buffer the full stream or forward chunks — matters for latency
+- Streaming works by passing a `StreamReader` through the graph; see `schema/streaming.go` for the internals
+- When debugging graph execution, wrapping nodes with a simple logging middleware saves a lot of time
+- The `flow/` package has ready-made patterns (ReAct agent, map-reduce) worth studying before rolling your own
+- TODO: look into whether `graph.go` fan-out nodes copy the stream or just pass the same reader — suspect there's a gotcha there
