@@ -89,6 +89,13 @@ func (g *Graph) AddEdge(from, to string) error {
 	if from == to {
 		return fmt.Errorf("compose: self-loop on node %q is not allowed", from)
 	}
+	// Check for duplicate edges to avoid inflating in-degree counts during
+	// topological sort, which would cause valid graphs to be rejected.
+	for _, e := range g.edges {
+		if e.From == from && e.To == to {
+			return fmt.Errorf("compose: edge from %q to %q already exists", from, to)
+		}
+	}
 	g.edges = append(g.edges, &Edge{From: from, To: to})
 	g.adj[from] = append(g.adj[from], to)
 	return nil
@@ -115,18 +122,4 @@ func (g *Graph) topologicalOrder() ([]string, error) {
 	order := make([]string, 0, len(g.nodes))
 	for len(queue) > 0 {
 		cur := queue[0]
-		queue = queue[1:]
-		order = append(order, cur)
-		for _, next := range g.adj[cur] {
-			inDegree[next]--
-			if inDegree[next] == 0 {
-				queue = append(queue, next)
-			}
-		}
-	}
-
-	if len(order) != len(g.nodes) {
-		return nil, fmt.Errorf("compose: graph contains a cycle, cannot determine topological order")
-	}
-	return order, nil
-}
+		qu
