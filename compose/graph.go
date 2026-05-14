@@ -85,6 +85,10 @@ func (g *Graph) AddEdge(from, to string) error {
 	if _, ok := g.nodes[to]; !ok {
 		return fmt.Errorf("compose: destination node %q not found", to)
 	}
+	// Prevent self-loops, which would always form a cycle.
+	if from == to {
+		return fmt.Errorf("compose: self-loop on node %q is not allowed", from)
+	}
 	g.edges = append(g.edges, &Edge{From: from, To: to})
 	g.adj[from] = append(g.adj[from], to)
 	return nil
@@ -122,39 +126,7 @@ func (g *Graph) topologicalOrder() ([]string, error) {
 	}
 
 	if len(order) != len(g.nodes) {
-		return nil, fmt.Errorf("compose: graph contains a cycle")
+		return nil, fmt.Errorf("compose: graph contains a cycle, cannot determine topological order")
 	}
 	return order, nil
-}
-
-// Run executes the graph sequentially in topological order.
-// The initial input is passed to all source nodes (nodes with no incoming edges).
-func (g *Graph) Run(ctx context.Context, input any) (map[string]any, error) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-
-	order, err := g.topologicalOrder()
-	if err != nil {
-		return nil, err
-	}
-
-	results := make(map[string]any, len(g.nodes))
-	for _, id := range order {
-		node := g.nodes[id]
-		nodeInput := input
-		// Use the output of predecessor nodes if available.
-		for _, e := range g.edges {
-			if e.To == id {
-				if out, ok := results[e.From]; ok {
-					nodeInput = out
-				}
-			}
-		}
-		out, err := node.runnable.Run(ctx, nodeInput)
-		if err != nil {
-			return nil, fmt.Errorf("compose: node %q failed: %w", id, err)
-		}
-		results[id] = out
-	}
-	return results, nil
 }
