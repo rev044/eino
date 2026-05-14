@@ -19,3 +19,6 @@ require (
 	golang.org/x/sys v0.18.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+// Note: google/uuid should be a direct dependency, not indirect.
+// Moved it out of the indirect block above to reflect actual usage.
