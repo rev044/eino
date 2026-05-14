@@ -94,7 +94,7 @@ eino/
 Things I've found useful while exploring this codebase:
 
 - The `compose` package is the best place to start — `chain.go` and `graph.go` are well-commented
-- Streaming: use `chain.Stream()` instead of `chain.Invoke()` and range over the returned `*schema.StreamReader`
-- When building graphs, `graph.AddEdge` vs `graph.AddBranch` tripped me up early — branches are for conditional routing
-- The `flow/` package has ready-made patterns (e.g. ReAct agent loop) that are worth reading before rolling your own
-- Good first issue area: `components/retriever` — the interface is small and easy to implement against a custom vector store
+- Streaming: use `chain.Stream()` instead of `chain.Invoke()` and iterate with `stream.Recv()` in a loop
+- When building graphs, `AddEdge` vs `AddBranch` tripped me up early — branches are for conditional routing, edges are unconditional
+- The `flow/` package has ready-made patterns (ReAct agent, map-reduce) that are worth reading before rolling your own
+- TODO: investigate whether `graph.go` fan-out nodes buffer the full stream or forward chunks — matters for latency
